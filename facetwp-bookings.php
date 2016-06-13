@@ -3,7 +3,7 @@
 Plugin Name: FacetWP - Bookings Integration
 Plugin URI: https://facetwp.com/
 Description: WooCommerce Bookings support
-Version: 0.1
+Version: 0.2
 Author: Matt Gibbs
 GitHub Plugin URI: https://github.com/FacetWP/facetwp-bookings
 
@@ -196,23 +196,23 @@ class FacetWP_Facet_Availability
      * Output any front-end scripts
      */
     function front_scripts() {
+        FWP()->display->assets['bootstrap-datepicker.css'] = FACETWP_URL . '/assets/js/bootstrap-datepicker/bootstrap-datepicker.css';
+        FWP()->display->assets['bootstrap-datepicker.js'] = FACETWP_URL . '/assets/js/bootstrap-datepicker/bootstrap-datepicker.min.js';
 ?>
-<link href="<?php echo FACETWP_URL; ?>/assets/js/bootstrap-datepicker/bootstrap-datepicker.css?ver=1.6.0" rel="stylesheet">
-<script src="<?php echo FACETWP_URL; ?>/assets/js/bootstrap-datepicker/bootstrap-datepicker.min.js?ver=1.6.0"></script>
 <script>
 (function($) {
-    wp.hooks.addAction('facetwp/refresh/availability', function($this, facet_name) {
-        var min = $this.find('.facetwp-date-min').val() || '';
-        var max = $this.find('.facetwp-date-max').val() || '';
-        var quantity = $this.find('.facetwp-quantity').val() || 1;
-        FWP.facets[facet_name] = ('' != min && '' != max) ? [min, max, quantity] : [];
-    });
+    $(function() {
+        wp.hooks.addAction('facetwp/refresh/availability', function($this, facet_name) {
+            var min = $this.find('.facetwp-date-min').val() || '';
+            var max = $this.find('.facetwp-date-max').val() || '';
+            var quantity = $this.find('.facetwp-quantity').val() || 1;
+            FWP.facets[facet_name] = ('' != min && '' != max) ? [min, max, quantity] : [];
+        });
 
-    wp.hooks.addFilter('facetwp/selections/availability', function(output, params) {
-        return params.selected_values[0] + ' - ' + params.selected_values[1];
-    });
+        wp.hooks.addFilter('facetwp/selections/availability', function(output, params) {
+            return params.selected_values[0] + ' - ' + params.selected_values[1];
+        });
 
-    wp.hooks.addAction('facetwp/ready', function() {
         $(document).on('facetwp-loaded', function() {
             $('.facetwp-date').datepicker({
                 format: 'yyyy-mm-dd',
