@@ -10,8 +10,6 @@ GitHub URI: facetwp/facetwp-bookings
 
 defined( 'ABSPATH' ) or exit;
 
-include( dirname( __FILE__ ) . '/github-updater.php' );
-
 /**
  * Register facet type
  */
