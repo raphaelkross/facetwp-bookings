@@ -3,7 +3,7 @@
 Plugin Name: FacetWP - Bookings Integration
 Plugin URI: https://facetwp.com/
 Description: WooCommerce Bookings support
-Version: 0.3
+Version: 0.3.1
 Author: FacetWP, LLC
 GitHub URI: facetwp/facetwp-bookings
 */
@@ -184,29 +184,29 @@ class FacetWP_Facet_Availability
 ?>
 <script>
 (function($) {
-    $(function() {
-        wp.hooks.addAction('facetwp/refresh/availability', function($this, facet_name) {
-            var min = $this.find('.facetwp-date-min').val() || '';
-            var max = $this.find('.facetwp-date-max').val() || '';
-            var quantity = $this.find('.facetwp-quantity').val() || 1;
-            FWP.facets[facet_name] = ('' != min && '' != max) ? [min, max, quantity] : [];
-        });
+    wp.hooks.addAction('facetwp/refresh/availability', function($this, facet_name) {
+        var min = $this.find('.facetwp-date-min').val() || '';
+        var max = $this.find('.facetwp-date-max').val() || '';
+        var quantity = $this.find('.facetwp-quantity').val() || 1;
+        FWP.facets[facet_name] = ('' != min && '' != max) ? [min, max, quantity] : [];
+    });
 
-        wp.hooks.addFilter('facetwp/selections/availability', function(output, params) {
-            return params.selected_values[0] + ' - ' + params.selected_values[1];
-        });
+    wp.hooks.addFilter('facetwp/selections/availability', function(output, params) {
+        return params.selected_values[0] + ' - ' + params.selected_values[1];
+    });
 
-        $(document).on('facetwp-loaded', function() {
-            $('.facetwp-date').datepicker({
+    $(document).on('facetwp-loaded', function() {
+        if (0 < $('.facetwp-type-availability .facetwp-date').length) {
+            $('.facetwp-type-availability .facetwp-date').datepicker({
                 format: 'yyyy-mm-dd',
                 autoclose: true,
                 clearBtn: true
             });
-        });
+        }
+    });
 
-        $(document).on('click', '.facetwp-availability-update', function() {
-            FWP.refresh();
-        });
+    $(document).on('click', '.facetwp-availability-update', function() {
+        FWP.autoload();
     });
 })(jQuery);
 </script>
