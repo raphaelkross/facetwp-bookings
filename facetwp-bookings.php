@@ -263,11 +263,9 @@ class FacetWP_Facet_Availability
         if ( function_exists( 'wpjmp' ) ) {
             global $wpdb;
 
-            $output = array();
-
             // Get the "_products" meta key for published job_listings
             $sql = "
-            SELECT DISTINCT p.ID, pm.meta_value AS products
+            SELECT DISTINCT p.ID AS listing_id, pm.meta_value AS products
             FROM {$wpdb->posts} p
             INNER JOIN {$wbdb->postmeta} pm ON pm.post_id = p.ID AND pm.meta_key = '_products'
             WHERE p.post_type = 'job_listing' AND p.post_status = 'publish'
@@ -275,21 +273,16 @@ class FacetWP_Facet_Availability
             $results = $wpdb->get_results( $sql );
 
             foreach ( $results as $result ) {
-
-                // Unserialize the job listing's related products
                 $related_product_ids = (array) maybe_unserialize( $result->products );
 
-                // If any of this listing's products are within $product_ids,
-                // Then add this listing's ID to the output array
-                $intersect = array_intersect( $related_product_ids, $product_ids );
-                if ( 0 < count( $intersect ) ) {
-                    $output[] = $result->ID;
+                // Add the job listing's ID to the output array if any of its
+                // related _products are in the $product_ids array
+                foreach ( $related_product_ids as $id ) {
+                    if ( in_array( $id, $product_ids ) ) {
+                        $product_ids[] = $result->listing_id;
+                        break;
+                    }
                 }
-            }
-
-            // Append job_listing IDs to the end of filtered IDs
-            foreach ( $output as $id ) {
-                $product_ids[] = $id;
             }
         }
 
