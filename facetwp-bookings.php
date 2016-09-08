@@ -155,6 +155,30 @@ class FacetWP_Facet_Availability
 
 
     /**
+     * WPJM - Products plugin integration
+     * Use $this->product_to_job_listings to include related job_listing IDs
+     */
+    function wpjm_products_integration( $product_ids ) {
+        if ( function_exists( 'wpjmp' ) ) {
+            $job_listing_ids = array();
+            foreach ( $product_ids as $pid ) {
+                if ( isset( $this->product_to_job_listings[ $pid ] ) ) {
+                    foreach ( $this->product_to_job_listings[ $pid ] as $job_listing_id ) {
+                        $job_listing_ids[ $job_listing_id ] = true; // prevents duplicate IDs!
+                    }
+                }
+            }
+
+            foreach ( array_keys( $job_listing_ids ) as $id ) {
+                $product_ids[] = $id;
+            }
+        }
+
+        return $product_ids;
+    }
+
+
+    /**
      * Calculate days between 2 date intervals
      *
      * @requires PHP 5.3+
@@ -272,29 +296,5 @@ class FacetWP_Facet_Availability
 })(jQuery);
 </script>
 <?php
-    }
-
-
-    /**
-     * WPJM - Products plugin integration
-     * Use $this->product_to_job_listings to include related job_listing IDs
-     */
-    function wpjm_products_integration( $product_ids ) {
-        if ( function_exists( 'wpjmp' ) ) {
-            $job_listing_ids = array();
-            foreach ( $product_ids as $pid ) {
-                if ( isset( $this->product_to_job_listings[ $pid ] ) ) {
-                    foreach ( $this->product_to_job_listings[ $pid ] as $job_listing_id ) {
-                        $job_listing_ids[ $job_listing_id ] = true; // prevents duplicate IDs!
-                    }
-                }
-            }
-
-            foreach ( array_keys( $job_listing_ids ) as $id ) {
-                $product_ids[] = $id;
-            }
-        }
-
-        return $product_ids;
     }
 }
