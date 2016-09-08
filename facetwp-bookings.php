@@ -24,6 +24,9 @@ add_filter( 'facetwp_facet_types', function( $facet_types ) {
  */
 class FacetWP_Facet_Availability
 {
+    public $product_ids;
+    public $product_to_job_listings; // key = product ID, value = array of job_listing IDs
+
 
     function __construct() {
         $this->label = __( 'Availability', 'fwp' );
@@ -63,6 +66,25 @@ class FacetWP_Facet_Availability
         $end_date = empty( $values[1] ) ? '' : $values[1];
         $quantity = empty( $values[2] ) ? 1 : (int) $values[2];
 
+        // WPJM Products integration
+        if ( function_exists( 'wpjmp' ) ) {
+            $temp = array();
+            foreach ( FWP()->unfiltered_post_ids as $post_id ) {
+                if ( 'job_listing' == get_post_type( $post_id ) ) {
+                    $related_product_ids = (array) get_post_meta( $post_id, '_products', true );
+                    foreach ( $related_product_ids as $id ) {
+                        $this->product_to_job_listings[ $id ][] = $post_id;
+                        $temp[ $id ] = true;
+                    }
+                }
+            }
+            $this->product_ids = array_keys( $temp );
+        }
+        else {
+            $this->product_ids = FWP()->unfiltered_post_ids;
+        }
+
+        // Get available bookings
         if ( $this->is_valid_date( $start_date ) && $this->is_valid_date( $end_date ) ) {
             $output = $this->get_available_bookings( $start_date, $end_date, $quantity );
         }
@@ -99,7 +121,7 @@ class FacetWP_Facet_Availability
         );
 
         // Loop through all posts
-        foreach ( FWP()->unfiltered_post_ids as $post_id ) {
+        foreach ( $this->product_ids as $post_id ) {
             if ( 'product' == get_post_type( $post_id ) ) {
                 $product = wc_get_product( $post_id );
                 if ( is_wc_booking_product( $product ) ) {
@@ -255,32 +277,21 @@ class FacetWP_Facet_Availability
 
     /**
      * WPJM - Products plugin integration
-     * Lookup and return job_listing post IDs based on matching products
+     * Use $this->product_to_job_listings to include related job_listing IDs
      */
     function wpjm_products_integration( $product_ids ) {
         if ( function_exists( 'wpjmp' ) ) {
-            global $wpdb;
-
-            // Get the "_products" meta key for published job_listings
-            $sql = "
-            SELECT DISTINCT p.ID AS listing_id, pm.meta_value AS products
-            FROM {$wpdb->posts} p
-            INNER JOIN {$wbdb->postmeta} pm ON pm.post_id = p.ID AND pm.meta_key = '_products'
-            WHERE p.post_type = 'job_listing' AND p.post_status = 'publish'
-            ";
-            $results = $wpdb->get_results( $sql );
-
-            foreach ( $results as $result ) {
-                $related_product_ids = (array) maybe_unserialize( $result->products );
-
-                // Add the job listing's ID to the output array if any of its
-                // related _products are in the $product_ids array
-                foreach ( $related_product_ids as $id ) {
-                    if ( in_array( $id, $product_ids ) ) {
-                        $product_ids[] = $result->listing_id;
-                        break;
+            $job_listing_ids = array();
+            foreach ( $product_ids as $pid ) {
+                if ( isset( $this->product_to_job_listings[ $pid ] ) ) {
+                    foreach ( $this->product_to_job_listings[ $pid ] as $job_listing_id ) {
+                        $job_listing_ids[ $job_listing_id ] = true; // prevents duplicate IDs!
                     }
                 }
+            }
+
+            foreach ( array_keys( $job_listing_ids ) as $id ) {
+                $product_ids[] = $id;
             }
         }
 
