@@ -28,8 +28,8 @@ class FacetWP_Facet_Availability
     function __construct() {
         $this->label = __( 'Availability', 'fwp' );
 
-        // Store unfiltered IDs
         add_filter( 'facetwp_store_unfiltered_post_ids', '__return_true' );
+        add_filter( 'facetwp_bookings_filter_posts', array( $this, 'wpjm_products_integration' ) );
     }
 
 
@@ -55,6 +55,7 @@ class FacetWP_Facet_Availability
     function filter_posts( $params ) {
         global $wpdb;
 
+        $output = array();
         $facet = $params['facet'];
         $values = $params['selected_values'];
 
@@ -63,10 +64,10 @@ class FacetWP_Facet_Availability
         $quantity = empty( $values[2] ) ? 1 : (int) $values[2];
 
         if ( $this->is_valid_date( $start_date ) && $this->is_valid_date( $end_date ) ) {
-            return $this->get_available_bookings( $start_date, $end_date, $quantity );
+            $output = $this->get_available_bookings( $start_date, $end_date, $quantity );
         }
 
-        return array();
+        return apply_filters( 'facetwp_bookings_filter_posts', $output );
     }
 
 
@@ -81,8 +82,10 @@ class FacetWP_Facet_Availability
     function get_available_bookings( $start_date, $end_date, $quantity = 1 ) {
         $matches = array();
 
-        $start = explode( '-', $start_date );
-        $end = explode( '-', $end_date );
+        $start_date = explode( ' ', $start_date );
+        $end_date = explode( ' ', $end_date );
+        $start = explode( '-', $start_date[0] );
+        $end = explode( '-', $end_date[0] );
 
         $args = array(
             'wc_bookings_field_persons' => $quantity,
@@ -95,20 +98,29 @@ class FacetWP_Facet_Availability
             'wc_bookings_field_start_date_to_day' => $end[2],
         );
 
+        // Loop through all posts
         foreach ( FWP()->unfiltered_post_ids as $post_id ) {
             if ( 'product' == get_post_type( $post_id ) ) {
                 $product = wc_get_product( $post_id );
                 if ( is_wc_booking_product( $product ) ) {
 
+                    // Support time
+                    if ( 'hour' == $product->get_duration_unit() ) {
+                        if ( ! empty( $start_date[1] ) ) {
+                            $args['wc_bookings_field_start_date_time'] = $start_date[1];
+                        }
+                    }
+
                     // Support WooCommerce Accomodation Bookings plugin
+                    // @src woocommerce-bookings/includes/booking-form/class-wc-booking-form.php
                     $unit = ( 'accommodation-booking' == $product->product_type ) ? 'night' : 'day';
-                    $duration = $this->calculate_duration( $start_date, $end_date, $unit );
+                    $duration = $this->calculate_duration( $start_date[0], $end_date[0], $unit );
                     $args['wc_bookings_field_duration'] = $duration;
 
                     $booking_form = new WC_Booking_Form( $product );
                     $posted_data = $booking_form->get_posted_data( $args );
 
-                    // returns WP_Error on fail
+                    // Returns WP_Error on fail
                     if ( true === $booking_form->is_bookable( $posted_data ) ) {
                         $matches[] = $post_id;
                     }
@@ -149,9 +161,16 @@ class FacetWP_Facet_Availability
         if ( empty( $date ) ) {
             return false;
         }
+        elseif ( 10 === strlen( $date ) ) {
+            $d = DateTime::createFromFormat( 'Y-m-d', $date );
+            return $d && $d->format( 'Y-m-d' ) === $date;
+        }
+        elseif ( 16 === strlen( $date ) ) {
+            $d = DateTime::createFromFormat( 'Y-m-d H:i', $date );
+            return $d && $d->format( 'Y-m-d H:i' ) === $date;
+        }
 
-        $d = DateTime::createFromFormat( 'Y-m-d', $date );
-        return $d && $d->format( 'Y-m-d' ) == $date;
+        return false;
     }
 
 
@@ -202,9 +221,7 @@ class FacetWP_Facet_Availability
         }
 
         var flatpickr_opts = {
-            altInput: true,
-            altInputClass: 'flatpickr-alt',
-            altFormat: 'Y-m-d',
+            //enableTime: true,
             onReady: function(dateObj, dateStr, instance) {
                 var $cal = $(instance.calendarContainer);
                 if ($cal.find('.flatpickr-clear').length < 1) {
@@ -233,5 +250,40 @@ class FacetWP_Facet_Availability
 })(jQuery);
 </script>
 <?php
+    }
+
+
+    /**
+     * WPJM - Products plugin integration
+     * Lookup and return job_listing post IDs based on matching products
+     */
+    function wpjm_products_integration( $product_ids ) {
+        if ( function_exists( 'wpjmp' ) ) {
+            global $wpdb;
+
+            // Get the "_products" meta key for published job_listings
+            $sql = "
+            SELECT DISTINCT p.ID AS listing_id, pm.meta_value AS products
+            FROM {$wpdb->posts} p
+            INNER JOIN {$wbdb->postmeta} pm ON pm.post_id = p.ID AND pm.meta_key = '_products'
+            WHERE p.post_type = 'job_listing' AND p.post_status = 'publish'
+            ";
+            $results = $wpdb->get_results( $sql );
+
+            foreach ( $results as $result ) {
+                $related_product_ids = (array) maybe_unserialize( $result->products );
+
+                // Add the job listing's ID to the output array if any of its
+                // related _products are in the $product_ids array
+                foreach ( $related_product_ids as $id ) {
+                    if ( in_array( $id, $product_ids ) ) {
+                        $product_ids[] = $result->listing_id;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return $product_ids;
     }
 }
