@@ -268,6 +268,7 @@ class FacetWP_Facet_Availability
 
         var flatpickr_opts = {
             //enableTime: true,
+            minDate: new Date().toISOString().slice(0, 10),
             onReady: function(dateObj, dateStr, instance) {
                 var $cal = $(instance.calendarContainer);
                 if ($cal.find('.flatpickr-clear').length < 1) {
