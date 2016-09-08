@@ -259,10 +259,40 @@ class FacetWP_Facet_Availability
      * WPJM - Products plugin integration
      * Lookup and return job_listing post IDs based on matching products
      */
-    function wpjm_products_integration( $post_ids ) {
+    function wpjm_products_integration( $product_ids ) {
         if ( function_exists( 'wpjmp' ) ) {
-            
+            global $wpdb;
+
+            $output = array();
+
+            // Get the "_products" meta key for published job_listings
+            $sql = "
+            SELECT DISTINCT p.ID, pm.meta_value AS products
+            FROM {$wpdb->posts} p
+            INNER JOIN {$wbdb->postmeta} pm ON pm.post_id = p.ID AND pm.meta_key = '_products'
+            WHERE p.post_type = 'job_listing' AND p.post_status = 'publish'
+            ";
+            $results = $wpdb->get_results( $sql );
+
+            foreach ( $results as $result ) {
+
+                // Unserialize the job listing's related products
+                $related_product_ids = (array) maybe_unserialize( $result->products );
+
+                // If any of this listing's products are within $product_ids,
+                // Then add this listing's ID to the output array
+                $intersect = array_intersect( $related_product_ids, $product_ids );
+                if ( 0 < count( $intersect ) ) {
+                    $output[] = $result->ID;
+                }
+            }
+
+            // Append job_listing IDs to the end of filtered IDs
+            foreach ( $output as $id ) {
+                $product_ids[] = $id;
+            }
         }
-        return $post_ids;
+
+        return $product_ids;
     }
 }
