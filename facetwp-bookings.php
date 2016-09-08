@@ -1,10 +1,10 @@
 <?php
 /*
 Plugin Name: FacetWP - Bookings Integration
-Plugin URI: https://facetwp.com/
 Description: WooCommerce Bookings support
 Version: 0.3.1
 Author: FacetWP, LLC
+Author URI: https://facetwp.com/
 GitHub URI: facetwp/facetwp-bookings
 */
 
@@ -179,8 +179,8 @@ class FacetWP_Facet_Availability
      * Output any front-end scripts
      */
     function front_scripts() {
-        FWP()->display->assets['bootstrap-datepicker.css'] = FACETWP_URL . '/assets/js/bootstrap-datepicker/bootstrap-datepicker.css';
-        FWP()->display->assets['bootstrap-datepicker.js'] = FACETWP_URL . '/assets/js/bootstrap-datepicker/bootstrap-datepicker.min.js';
+        FWP()->display->assets['flatpickr.css'] = FACETWP_URL . '/assets/js/flatpickr/flatpickr.min.css';
+        FWP()->display->assets['flatpickr.js'] = FACETWP_URL . '/assets/js/flatpickr/flatpickr.min.js';
 ?>
 <script>
 (function($) {
@@ -196,13 +196,35 @@ class FacetWP_Facet_Availability
     });
 
     $(document).on('facetwp-loaded', function() {
-        if (0 < $('.facetwp-type-availability .facetwp-date').length) {
-            $('.facetwp-type-availability .facetwp-date').datepicker({
-                format: 'yyyy-mm-dd',
-                autoclose: true,
-                clearBtn: true
-            });
+        var $dates = $('.facetwp-type-availability .facetwp-date:not(.ready)');
+        if (0 === $dates.length) {
+            return;
         }
+
+        var flatpickr_opts = {
+            altInput: true,
+            altInputClass: 'flatpickr-alt',
+            altFormat: 'Y-m-d',
+            onReady: function(dateObj, dateStr, instance) {
+                var $cal = $(instance.calendarContainer);
+                if ($cal.find('.flatpickr-clear').length < 1) {
+                    $cal.append('<div class="flatpickr-clear">Clear</div>');
+                    $cal.find('.flatpickr-clear').on('click', function() {
+                        instance.clear();
+                        instance.close();
+                    });
+                }
+            }
+        };
+
+        $dates.each(function() {
+            var facet_name = $(this).closest('.facetwp-facet').attr('data-name');
+            var opts = wp.hooks.applyFilters('facetwp/set_options/availability', flatpickr_opts, {
+                'facet_name': facet_name
+            });
+            new Flatpickr(this, opts);
+            $(this).addClass('ready');
+        });
     });
 
     $(document).on('click', '.facetwp-availability-update', function() {
