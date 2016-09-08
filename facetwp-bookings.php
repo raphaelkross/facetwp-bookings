@@ -28,9 +28,7 @@ class FacetWP_Facet_Availability
     function __construct() {
         $this->label = __( 'Availability', 'fwp' );
 
-        // Store unfiltered IDs
         add_filter( 'facetwp_store_unfiltered_post_ids', '__return_true' );
-
         add_filter( 'facetwp_bookings_filter_posts', array( $this, 'wpjm_products_integration' ) );
     }
 
