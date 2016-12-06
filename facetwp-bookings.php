@@ -289,8 +289,19 @@ class FacetWP_Facet_Availability
      * Output any front-end scripts
      */
     function front_scripts() {
+        $locale = get_locale();
+        $locale = empty( $locale ) ? 'en' : substr( $locale, 0, 2 );
+
+        FWP()->display->json['datepicker'] = array(
+            'locale'    => $locale,
+            'clearText' => __( 'Clear', 'fwp' ),
+        );
         FWP()->display->assets['flatpickr.css'] = FACETWP_URL . '/assets/js/flatpickr/flatpickr.css';
         FWP()->display->assets['flatpickr.js'] = FACETWP_URL . '/assets/js/flatpickr/flatpickr.min.js';
+
+        if ( 'en' != $locale ) {
+            FWP()->display->assets['flatpickr-l10n.js'] = FACETWP_URL . "/assets/js/flatpickr/l10n/$locale.js";
+        }
 ?>
 <script>
 (function($) {
@@ -313,10 +324,11 @@ class FacetWP_Facet_Availability
 
         var flatpickr_opts = {            
             minDate: new Date().toISOString().slice(0, 10),
+            locale: FWP_JSON.datepicker.locale,
             onReady: function(dateObj, dateStr, instance) {
                 var $cal = $(instance.calendarContainer);
                 if ($cal.find('.flatpickr-clear').length < 1) {
-                    $cal.append('<div class="flatpickr-clear">Clear</div>');
+                    $cal.append('<div class="flatpickr-clear">' + FWP_JSON.datepicker.clearText + '</div>');
                     $cal.find('.flatpickr-clear').on('click', function() {
                         instance.clear();
                         instance.close();
