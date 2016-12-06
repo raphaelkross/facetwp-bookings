@@ -42,10 +42,13 @@ class FacetWP_Facet_Availability
     function render( $params ) {
         $value = $params['selected_values'];
         $value = empty( $value ) ? array( '', '', 1 ) : $value;
+        $time  = 'yes' === $params['facet']['time'] ? 'true' : 'false';
+        $minute_increment = empty( $params['facet']['minute_increment'] ) ? 1 : $params['facet']['minute_increment'];
+        $hour_increment = empty( $params['facet']['hour_increment'] ) ? 1 : $params['facet']['hour_increment'];
 
         $output = '';
-        $output .= '<input type="text" class="facetwp-date facetwp-date-min" value="' . $value[0] . '" placeholder="' . __( 'Start Date', 'fwp' ) . '" />';
-        $output .= '<input type="text" class="facetwp-date facetwp-date-max" value="' . $value[1] . '" placeholder="' . __( 'End Date', 'fwp' ) . '" />';
+        $output .= '<input type="text" class="facetwp-date facetwp-date-min" data-minute-increment="' . $minute_increment . '" data-hour-increment="' . $hour_increment . '" data-enable-time="' . $time . '" value="' . $value[0] . '" placeholder="' . __( 'Start Date', 'fwp' ) . '" />';
+        $output .= '<input type="text" class="facetwp-date facetwp-date-max" data-minute-increment="' . $minute_increment . '" data-hour-increment="' . $hour_increment . '" data-enable-time="' . $time . '" value="' . $value[1] . '" placeholder="' . __( 'End Date', 'fwp' ) . '" />';
         $output .= '<input type="number" class="facetwp-quantity" value="1" min="' . $value[2] . '" max="20" placeholder="' . __( 'Quantity', 'fwp' ) . '" />';
         $output .= '<input type="submit" class="facetwp-availability-update" value="' . __( 'Update', 'fwp' ) . '" />';
         return $output;
@@ -61,6 +64,7 @@ class FacetWP_Facet_Availability
         $output = array();
         $facet = $params['facet'];
         $values = $params['selected_values'];
+        $behavior = empty( $facet['behavior'] ) ? 'default' : $facet['behavior'];
 
         $start_date = empty( $values[0] ) ? '' : $values[0];
         $end_date = empty( $values[1] ) ? '' : $values[1];
@@ -86,7 +90,7 @@ class FacetWP_Facet_Availability
 
         // Get available bookings
         if ( $this->is_valid_date( $start_date ) && $this->is_valid_date( $end_date ) ) {
-            $output = $this->get_available_bookings( $start_date, $end_date, $quantity );
+            $output = $this->get_available_bookings( $start_date, $end_date, $quantity, $behavior );
         }
 
         return apply_filters( 'facetwp_bookings_filter_posts', $output );
@@ -96,16 +100,16 @@ class FacetWP_Facet_Availability
     /**
      * Get all available booking products
      *
-     * @param string $start_date YYYY-MM-DD format
-     * @param string $end_date YYYY-MM-DD format
+     * @param string $start_date_raw YYYY-MM-DD format
+     * @param string $end_date_raw YYYY-MM-DD format
      * @param int $quantity Number of people to book
      * @return array Available post IDs
      */
-    function get_available_bookings( $start_date, $end_date, $quantity = 1 ) {
+    function get_available_bookings( $start_date_raw, $end_date_raw, $quantity = 1, $behavior = 'default' ) {
         $matches = array();
 
-        $start_date = explode( ' ', $start_date );
-        $end_date = explode( ' ', $end_date );
+        $start_date = explode( ' ', $start_date_raw );
+        $end_date = explode( ' ', $end_date_raw );
         $start = explode( '-', $start_date[0] );
         $end = explode( '-', $end_date[0] );
 
@@ -127,7 +131,7 @@ class FacetWP_Facet_Availability
                 if ( is_wc_booking_product( $product ) ) {
 
                     // Support time
-                    if ( 'hour' == $product->get_duration_unit() ) {
+                    if ( in_array( $product->get_duration_unit(), array( 'minute', 'hour' ) ) ) {
                         if ( ! empty( $start_date[1] ) ) {
                             $args['wc_bookings_field_start_date_time'] = $start_date[1];
                         }
@@ -135,9 +139,12 @@ class FacetWP_Facet_Availability
 
                     // Support WooCommerce Accomodation Bookings plugin
                     // @src woocommerce-bookings/includes/booking-form/class-wc-booking-form.php
-                    $unit = ( 'accommodation-booking' == $product->product_type ) ? 'night' : 'day';
-                    $duration = $this->calculate_duration( $start_date[0], $end_date[0], $unit );
-                    $args['wc_bookings_field_duration'] = $duration;
+                    if( 'exact' === $behavior ){
+                        // if behavior is exact, then calculate how many units between start and finish
+                        $unit = ( 'accommodation-booking' == $product->product_type ) ? 'night' : $product->get_duration_unit();                    
+                        $duration = $this->calculate_duration( $start_date_raw, $end_date_raw, $product->get_duration(), $unit );
+                        $args['wc_bookings_field_duration'] = $duration;
+                    }
 
                     $booking_form = new WC_Booking_Form( $product );
                     $posted_data = $booking_form->get_posted_data( $args );
@@ -145,6 +152,16 @@ class FacetWP_Facet_Availability
                     // Returns WP_Error on fail
                     if ( true === $booking_form->is_bookable( $posted_data ) ) {
                         $matches[] = $post_id;
+                    }elseif( 'exact' !== $behavior ){
+                        $blocks_in_range  = $booking_form->product->get_blocks_in_range( strtotime( $start_date_raw ), strtotime( $end_date_raw ) );
+                        $available_blocks = $booking_form->product->get_available_blocks( $blocks_in_range );                        
+                        foreach( $available_blocks as $check ){
+                            if( true === $booking_form->product->check_availability_rules_against_date( $check, '' ) ){
+                                // required only a single true to be valid.
+                                $matches[] = $post_id;
+                                break;
+                            }
+                        }                     
                     }
                 }
             }
@@ -183,18 +200,37 @@ class FacetWP_Facet_Availability
      *
      * @requires PHP 5.3+
      */
-    function calculate_duration( $start_date, $end_date, $unit = 'day' ) {
+    function calculate_duration( $start_date, $end_date, $block_unit, $unit = 'day' ) {
+
         if ( $start_date > $end_date ) {
             return 0;
         }
+
         if ( $start_date == $end_date ) {
             return 1;
         }
 
-        $start = new DateTime( $start_date );
-        $end = new DateTime( $end_date );
-        $diff = (int) $end->diff( $start )->format( '%a' );
-        return ( 'day' == $unit ) ? $diff + 1 : $diff;
+        $start      = strtotime( $start_date );
+        $end        = strtotime( $end_date );
+        $difference = $end-$start;
+
+        switch ( $unit ) {
+            case 'minute':
+                $value = floor( $difference / 60 );
+                break;
+            case 'hour':
+                $value = floor( $difference / 3600 );
+                break;
+            case 'day':
+            default:
+                $value = floor( $difference / 86400 );
+                break;
+            case 'month':
+                $value = floor( $difference / 2678400 );
+                break;
+        }
+        // return total number divided by block unit
+        return abs( $value / $block_unit );
     }
 
 
@@ -229,10 +265,27 @@ class FacetWP_Facet_Availability
 (function($) {
     wp.hooks.addAction('facetwp/change/availability', function($this) {
         $this.closest('.facetwp-row').find('.name-source').hide();
+        $this.closest('.facetwp-row').find('.facet-time').trigger('change');
     });
-
+    wp.hooks.addAction('facetwp/load/availability', function($this, obj) {
+        $this.find('.facet-time').val(obj.time);
+        $this.find('.facet-minute-increment').val(obj.minute_increment);        
+        $this.find('.facet-hour-increment').val(obj.hour_increment);
+        $this.find('.facet-hour-increment').val(obj.behavior);        
+    });
     wp.hooks.addFilter('facetwp/save/availability', function($this, obj) {
+        obj['time'] = $this.find('.facet-time').val();
+        obj['minute_increment'] = $this.find('.facet-minute-increment').val();        
+        obj['hour_increment'] = $this.find('.facet-hour-increment').val();        
+        obj['behavior'] = $this.find('.facet-behavior').val();
         return obj;
+
+    });
+    $(document).on('change', '.facet-time', function() {
+        var $facet = $(this).closest('.facetwp-row');
+        var display = ('yes' == $(this).val()) ? 'table-row' : 'none';
+        $facet.find('.facet-minute-increment').closest('tr').css({ 'display' : display });
+        $facet.find('.facet-hour-increment').closest('tr').css({ 'display' : display });
     });
 })(jQuery);
 </script>
@@ -266,8 +319,7 @@ class FacetWP_Facet_Availability
             return;
         }
 
-        var flatpickr_opts = {
-            //enableTime: true,
+        var flatpickr_opts = {            
             minDate: new Date().toISOString().slice(0, 10),
             onReady: function(dateObj, dateStr, instance) {
                 var $cal = $(instance.calendarContainer);
@@ -284,7 +336,7 @@ class FacetWP_Facet_Availability
         $dates.each(function() {
             var facet_name = $(this).closest('.facetwp-facet').attr('data-name');
             var opts = wp.hooks.applyFilters('facetwp/set_options/availability', flatpickr_opts, {
-                'facet_name': facet_name
+                'facet_name': facet_name,
             });
             new Flatpickr(this, opts);
             $(this).addClass('ready');
@@ -296,6 +348,67 @@ class FacetWP_Facet_Availability
     });
 })(jQuery);
 </script>
+<?php
+    }
+        /**
+     * Output admin settings HTML
+     */
+    function settings_html() {
+?>
+        <tr>
+            <td>
+                <?php _e('Use time?', 'fwp'); ?>:
+                <div class="facetwp-tooltip">
+                    <span class="icon-question">?</span>
+                    <div class="facetwp-tooltip-content"><?php _e( 'Support time based bookings?', 'fwp' ); ?></div>
+                </div>
+            </td>
+            <td>
+                <select class="facet-time">
+                    <option value="no"><?php _e( 'No', 'fwp' ); ?></option>
+                    <option value="yes"><?php _e( 'Yes', 'fwp' ); ?></option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <?php _e('Behavior', 'fwp'); ?>:
+                <div class="facetwp-tooltip">
+                    <span class="icon-question">?</span>
+                    <div class="facetwp-tooltip-content"><?php _e( 'Set how the range is handled.', 'fwp' ); ?></div>
+                </div>
+            </td>
+            <td>
+                <select class="facet-behavior">
+                    <option value="default"><?php _e( 'Any results within range', 'fwp' ); ?></option>
+                    <option value="exact"><?php _e( 'Results that match the exact range', 'fwp' ); ?></option>
+                </select>
+            </td>
+        </tr>        
+        <tr>
+            <td>
+                <?php _e('Minute Increment', 'fwp'); ?>:
+                <div class="facetwp-tooltip">
+                    <span class="icon-question">?</span>
+                    <div class="facetwp-tooltip-content"><?php _e( 'How many minutes can be incremented at a time?', 'fwp' ); ?></div>
+                </div>
+            </td>
+            <td>
+                <input type="number" class="facet-minute-increment" value="5" />
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <?php _e('Hour Increment', 'fwp'); ?>:
+                <div class="facetwp-tooltip">
+                    <span class="icon-question">?</span>
+                    <div class="facetwp-tooltip-content"><?php _e( 'How many hours can be incremented at a time?', 'fwp' ); ?></div>
+                </div>
+            </td>
+            <td>
+                <input type="number" class="facet-hour-increment" value="1" />
+            </td>
+        </tr>
 <?php
     }
 }
