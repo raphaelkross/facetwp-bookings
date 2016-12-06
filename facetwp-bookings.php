@@ -2,7 +2,7 @@
 /*
 Plugin Name: FacetWP - Bookings Integration
 Description: WooCommerce Bookings support
-Version: 0.4.1
+Version: 0.4.2
 Author: FacetWP, LLC
 Author URI: https://facetwp.com/
 GitHub URI: facetwp/facetwp-bookings
