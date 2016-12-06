@@ -103,6 +103,7 @@ class FacetWP_Facet_Availability
      * @param string $start_date_raw YYYY-MM-DD format
      * @param string $end_date_raw YYYY-MM-DD format
      * @param int $quantity Number of people to book
+     * @param string $behavior Whether to return exact matches
      * @return array Available post IDs
      */
     function get_available_bookings( $start_date_raw, $end_date_raw, $quantity = 1, $behavior = 'default' ) {
@@ -137,10 +138,9 @@ class FacetWP_Facet_Availability
                         }
                     }
 
-                    // Support WooCommerce Accomodation Bookings plugin
-                    // @src woocommerce-bookings/includes/booking-form/class-wc-booking-form.php
-                    if( 'exact' === $behavior ){
-                        // if behavior is exact, then calculate how many units between start and finish
+                    if ( 'exact' === $behavior ) {
+
+                        // If behavior is exact, calculate how many units between start and finish
                         $unit = ( 'accommodation-booking' == $product->product_type ) ? 'night' : $product->get_duration_unit();                    
                         $duration = $this->calculate_duration( $start_date_raw, $end_date_raw, $product->get_duration(), $unit );
                         $args['wc_bookings_field_duration'] = $duration;
@@ -149,17 +149,17 @@ class FacetWP_Facet_Availability
                     $booking_form = new WC_Booking_Form( $product );
                     $posted_data = $booking_form->get_posted_data( $args );
 
-                    // Returns WP_Error on fail
+                    // @src woocommerce-bookings/includes/booking-form/class-wc-booking-form.php
                     if ( true === $booking_form->is_bookable( $posted_data ) ) {
                         $matches[] = $post_id;
-                    }elseif( 'exact' !== $behavior ){
+                    }
+                    elseif ( 'exact' !== $behavior ) {
                         $blocks_in_range  = $booking_form->product->get_blocks_in_range( strtotime( $start_date_raw ), strtotime( $end_date_raw ) );
                         $available_blocks = $booking_form->product->get_available_blocks( $blocks_in_range );                        
-                        foreach( $available_blocks as $check ){
-                            if( true === $booking_form->product->check_availability_rules_against_date( $check, '' ) ){
-                                // required only a single true to be valid.
+                        foreach ( $available_blocks as $check ) {
+                            if( true === $booking_form->product->check_availability_rules_against_date( $check, '' ) ) {
                                 $matches[] = $post_id;
-                                break;
+                                break; // check passed
                             }
                         }                     
                     }
@@ -197,11 +197,8 @@ class FacetWP_Facet_Availability
 
     /**
      * Calculate days between 2 date intervals
-     *
-     * @requires PHP 5.3+
      */
     function calculate_duration( $start_date, $end_date, $block_unit, $unit = 'day' ) {
-
         if ( $start_date > $end_date ) {
             return 0;
         }
@@ -210,27 +207,20 @@ class FacetWP_Facet_Availability
             return 1;
         }
 
-        $start      = strtotime( $start_date );
-        $end        = strtotime( $end_date );
-        $difference = $end-$start;
+        $diff = strtotime( $end_date ) - strtotime( $start_date );
 
-        switch ( $unit ) {
-            case 'minute':
-                $value = floor( $difference / 60 );
-                break;
-            case 'hour':
-                $value = floor( $difference / 3600 );
-                break;
-            case 'day':
-            default:
-                $value = floor( $difference / 86400 );
-                break;
-            case 'month':
-                $value = floor( $difference / 2678400 );
-                break;
-        }
-        // return total number divided by block unit
-        return abs( $value / $block_unit );
+        $units = array(
+            'minute'    => 60,
+            'hour'      => 3600,
+            'day'       => 86400,
+            'night'     => 86400,
+            'month'     => 2592000,
+        );
+
+        $value = floor( $diff / $units[ $unit ] );
+
+        // Return total number divided by block unit
+        return ( $value / $block_unit );
     }
 
 
@@ -267,20 +257,22 @@ class FacetWP_Facet_Availability
         $this.closest('.facetwp-row').find('.name-source').hide();
         $this.closest('.facetwp-row').find('.facet-time').trigger('change');
     });
+
     wp.hooks.addAction('facetwp/load/availability', function($this, obj) {
         $this.find('.facet-time').val(obj.time);
         $this.find('.facet-minute-increment').val(obj.minute_increment);        
         $this.find('.facet-hour-increment').val(obj.hour_increment);
-        $this.find('.facet-hour-increment').val(obj.behavior);        
+        $this.find('.facet-behavior').val(obj.behavior);        
     });
+
     wp.hooks.addFilter('facetwp/save/availability', function($this, obj) {
         obj['time'] = $this.find('.facet-time').val();
         obj['minute_increment'] = $this.find('.facet-minute-increment').val();        
         obj['hour_increment'] = $this.find('.facet-hour-increment').val();        
         obj['behavior'] = $this.find('.facet-behavior').val();
         return obj;
-
     });
+
     $(document).on('change', '.facet-time', function() {
         var $facet = $(this).closest('.facetwp-row');
         var display = ('yes' == $(this).val()) ? 'table-row' : 'none';
@@ -336,7 +328,7 @@ class FacetWP_Facet_Availability
         $dates.each(function() {
             var facet_name = $(this).closest('.facetwp-facet').attr('data-name');
             var opts = wp.hooks.applyFilters('facetwp/set_options/availability', flatpickr_opts, {
-                'facet_name': facet_name,
+                'facet_name': facet_name
             });
             new Flatpickr(this, opts);
             $(this).addClass('ready');
@@ -350,7 +342,9 @@ class FacetWP_Facet_Availability
 </script>
 <?php
     }
-        /**
+
+
+    /**
      * Output admin settings HTML
      */
     function settings_html() {
@@ -394,7 +388,7 @@ class FacetWP_Facet_Availability
                 </div>
             </td>
             <td>
-                <input type="number" class="facet-minute-increment" value="5" />
+                <input type="number" class="facet-minute-increment" value="15" />
             </td>
         </tr>
         <tr>
