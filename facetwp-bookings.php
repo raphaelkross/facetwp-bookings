@@ -111,6 +111,16 @@ class FacetWP_Facet_Availability
 
         $start_date = explode( ' ', $start_date_raw );
         $end_date = explode( ' ', $end_date_raw );
+
+        // If time wasn't passed, define defaults.
+        if ( ! isset( $start_date[1] ) ) {
+            $start_date[1] = '00:00';
+        }
+
+        if ( ! isset( $end_date[1] ) ) {
+            $end_date[1] = '23:59';
+        }
+
         $start = explode( '-', $start_date[0] );
         $end = explode( '-', $end_date[0] );
 
@@ -338,7 +348,12 @@ class FacetWP_Facet_Availability
         };
 
         $dates.each(function() {
-            var facet_name = $(this).closest('.facetwp-facet').attr('data-name');
+            var facetwp_facet = $(this).closest('.facetwp-facet');
+            var facet_name    = facetwp_facet.attr('data-name');
+            var date_format   = facetwp_facet.find('.facetwp-date').attr('data-enable-time') == 'true' ? 'Y-m-d H:i' : 'Y-m-d';
+
+            flatpickr_opts.dateFormat = date_format;
+
             var opts = wp.hooks.applyFilters('facetwp/set_options/availability', flatpickr_opts, {
                 'facet_name': facet_name
             });
