@@ -49,7 +49,7 @@ class FacetWP_Facet_Availability
         $output = '';
         $output .= '<input type="text" class="facetwp-date facetwp-date-min" data-minute-increment="' . $minute_increment . '" data-hour-increment="' . $hour_increment . '" data-enable-time="' . $time . '" value="' . $value[0] . '" placeholder="' . __( 'Start Date', 'fwp' ) . '" />';
         $output .= '<input type="text" class="facetwp-date facetwp-date-max" data-minute-increment="' . $minute_increment . '" data-hour-increment="' . $hour_increment . '" data-enable-time="' . $time . '" value="' . $value[1] . '" placeholder="' . __( 'End Date', 'fwp' ) . '" />';
-        $output .= '<input type="number" class="facetwp-quantity" value="1" min="' . $value[2] . '" max="20" placeholder="' . __( 'Quantity', 'fwp' ) . '" />';
+        $output .= '<input type="number" class="facetwp-quantity" value="'. esc_attr( $value[2] ) .'" min="0" placeholder="' . __( 'Quantity', 'fwp' ) . '" />';
         $output .= '<input type="submit" class="facetwp-availability-update" value="' . __( 'Update', 'fwp' ) . '" />';
         return $output;
     }
