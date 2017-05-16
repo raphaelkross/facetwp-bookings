@@ -43,7 +43,7 @@ class FacetWP_Facet_Availability
         $value = $params['selected_values'];
         $value = empty( $value ) ? array( '', '', 1 ) : $value;
         $time  = 'yes' === $params['facet']['time'] ? 'true' : 'false';
-        $time_format = ! empty ( $params['facet']['time_format'] ) ? $params['facet']['time_format'] : 'false';
+        $time_format = empty( $params['facet']['time_format'] ) ? '24hr' : $params['facet']['time_format'];
         $minute_increment = empty( $params['facet']['minute_increment'] ) ? 1 : $params['facet']['minute_increment'];
         $hour_increment = empty( $params['facet']['hour_increment'] ) ? 1 : $params['facet']['hour_increment'];
 
