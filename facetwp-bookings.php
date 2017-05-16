@@ -443,7 +443,7 @@ class FacetWP_Facet_Availability
             <td>
                 <select class="facet-time-format">
                     <option value="12hr"><?php _e( 'AM / PM', 'fwp' ); ?></option>
-                    <option value="24hr"><?php _e( '24 Hours', 'fwp' ); ?></option>
+                    <option value="24hr"><?php _e( '24 Hour', 'fwp' ); ?></option>
                 </select>
             </td>
         </tr>
